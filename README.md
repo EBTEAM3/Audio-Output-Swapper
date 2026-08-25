@@ -1,5 +1,9 @@
 # Audio Swapper
 
+[![Build](https://github.com/EBTEAM3/Audio-Output-Swapper/actions/workflows/ci.yml/badge.svg)](https://github.com/EBTEAM3/Audio-Output-Swapper/actions/workflows/ci.yml)
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-d97757)](https://claude.com/claude-code)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A Windows 11 tray app that flips your default audio output between two devices
 with one click, and shows you where the sound went.
 
@@ -247,6 +251,29 @@ host WebView2, and counting those would sweep in hundreds of unrelated megabytes
   mid-call cannot pull you out of what you were doing.
 - **Hotplug bursts are coalesced** — plugging in a headset fires several
   callbacks and produces exactly one refresh.
+
+---
+
+## Built with AI
+
+This project was written with [Claude Code](https://claude.com/claude-code).
+The code, the icon set and this README are AI-generated.
+
+That is worth knowing rather than hiding, so here is what it does and does not
+mean. Everything was built and verified against real hardware on a real Windows
+11 machine, not just compiled: device switching was checked against the actual
+default-endpoint roles before and after, the popup and panel were driven through
+real clicks and screenshotted, the memory numbers above were measured, and the
+icon set is checked on every push by a harness that fails the build on a
+malformed path. Three real bugs were found and fixed that way — a `PROPVARIANT`
+buffer overrun, a wrong property ID, and a startup toggle that could never be
+switched off.
+
+It also means nobody has hand-audited every line, and the app leans on an
+undocumented Windows COM interface (see
+[the caveat above](#how-it-works-and-the-one-caveat)). Read the source before
+you trust it with anything that matters — it is MIT-licensed and deliberately
+commented to explain *why*, not just *what*.
 
 ---
 
