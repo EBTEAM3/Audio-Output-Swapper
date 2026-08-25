@@ -1,0 +1,821 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Audio Swapper</title>
+<style>/*{GLASS_CSS}*/</style>
+<style>
+    body { background: transparent; }
+
+    .shell { display: flex; flex-direction: column; }
+
+    /* the floating bar: content width, a 16px gap above it so it floats,
+       radius-lg, and never sticky. No overflow:hidden or it would clip the
+       theme popover. */
+    .header {
+        position: relative;
+        z-index: 100;
+        flex: 0 0 auto;
+        width: calc(100% - 28px);
+        margin: 14px auto 0;
+        padding: 9px 10px 9px 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: var(--radius-lg);
+        background: var(--glass-sheen), var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: var(--glass-filter);
+        -webkit-backdrop-filter: var(--glass-filter);
+        box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hi);
+    }
+
+    .header .page-title { flex: 1; }
+
+    .scroll {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 18px 14px 22px;
+    }
+
+    section { margin-bottom: 20px; }
+    section:last-child { margin-bottom: 0; }
+
+    /* ---- The A/B pair ---------------------------------------------------- */
+
+    .pair {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: stretch;
+        gap: 9px;
+    }
+
+    .slot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-width: 0;
+        padding: 15px 10px;
+        border-radius: var(--radius);
+        text-align: center;
+        background: var(--glass-sheen), var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: var(--glass-filter-sm);
+        -webkit-backdrop-filter: var(--glass-filter-sm);
+        box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hi);
+    }
+
+    .slot-letter {
+        position: absolute;
+        top: 9px;
+        left: 12px;
+        font-size: 0.58rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        color: var(--text-tertiary);
+    }
+
+    .slot-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        background: var(--surface);
+        border: 1px solid var(--glass-border);
+        box-shadow: inset 0 1px 0 var(--glass-hi);
+        transition: background 0.3s var(--ease-smooth), color 0.3s, box-shadow 0.3s, border-color 0.3s;
+    }
+
+    .slot.is-live .slot-icon {
+        color: var(--on-accent);
+        background: linear-gradient(135deg, var(--accent-strong), var(--accent-partner));
+        border-color: transparent;
+        box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.5),
+                    0 8px 20px rgba(var(--accent-rgb), 0.45),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+
+    .slot-icon svg { width: 21px; height: 21px; }
+
+    /* Two lines rather than one: endpoint names are long and mostly suffix
+       ("Headphones (WH-1000XM5)"), so a single-line ellipsis cuts off the only
+       part that distinguishes one device from another. */
+    .slot-name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        max-width: 100%;
+        color: var(--text-primary);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.35;
+    }
+
+    .slot.empty .slot-name { color: var(--text-tertiary); font-weight: 500; }
+
+    /* an empty state is dashed, flat and shadowless. It should read
+       as an absence, not as an object. */
+    .slot.empty {
+        background: var(--surface);
+        border: 1px dashed var(--border);
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    .swap-btn {
+        align-self: center;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        background: var(--surface);
+        border: 1px solid var(--glass-border);
+        box-shadow: inset 0 1px 0 var(--glass-hi);
+        transition: transform 0.4s var(--ease-spring), color 0.25s,
+                    background 0.25s, box-shadow 0.25s;
+    }
+
+    .swap-btn svg { width: 19px; height: 19px; }
+    .swap-btn:hover:not(:disabled) {
+        color: var(--accent-strong);
+        background: var(--surface-2);
+        transform: rotate(180deg) scale(1.06);
+        box-shadow: inset 0 1px 0 var(--glass-hi), 0 6px 18px rgba(var(--accent-rgb), 0.25);
+    }
+    .swap-btn:active:not(:disabled) { transform: rotate(180deg) scale(0.92); }
+    .swap-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ---- Device rows ----------------------------------------------------- */
+
+    .panel {
+        border-radius: var(--radius);
+        background: var(--glass-sheen), var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: var(--glass-filter-sm);
+        -webkit-backdrop-filter: var(--glass-filter-sm);
+        box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hi);
+        overflow: hidden;
+    }
+
+    .row-icon {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        box-shadow: inset 0 1px 0 var(--glass-hi);
+        transition: transform 0.3s var(--ease-spring), color 0.25s, background 0.25s;
+    }
+    .row-icon svg { width: 17px; height: 17px; }
+    .row-icon:hover { color: var(--accent-strong); background: var(--surface-2); transform: scale(1.07); }
+    .row-icon:active { transform: scale(0.93); }
+
+    .row-body { flex: 1; min-width: 0; }
+
+    .row-name {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .row-sub {
+        font-size: 0.66rem;
+        color: var(--text-tertiary);
+        margin-top: 1px;
+    }
+
+    .slot-pills { display: flex; gap: 5px; }
+
+    .slot-pill {
+        width: 25px;
+        height: 25px;
+        flex: 0 0 25px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.68rem;
+        font-weight: 800;
+        color: var(--text-tertiary);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        transition: transform 0.3s var(--ease-spring), color 0.25s,
+                    background 0.25s, box-shadow 0.25s, border-color 0.25s;
+    }
+    .slot-pill:hover { color: var(--text-primary); background: var(--surface-2); transform: scale(1.08); }
+    .slot-pill:active { transform: scale(0.9); }
+    .slot-pill.on {
+        color: var(--on-accent);
+        background: linear-gradient(135deg, var(--accent-strong), var(--accent-partner));
+        border-color: transparent;
+        box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.45), 0 4px 12px rgba(var(--accent-rgb), 0.4);
+    }
+
+    /* ---- Options --------------------------------------------------------- */
+
+    .opt {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 13px;
+        border-bottom: 1px solid var(--border);
+    }
+    .opt:last-child { border-bottom: none; }
+
+    .opt-body { flex: 1; min-width: 0; }
+    .opt-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
+    .opt-hint { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 1px; }
+
+    .hotkey-input { width: 108px; text-align: center; font-weight: 600; letter-spacing: 0.02em; }
+
+    .error-note {
+        font-size: 0.66rem;
+        color: var(--danger);
+        margin-top: 5px;
+        padding: 0 13px 9px;
+    }
+
+    /* ---- Icon picker popover --------------------------------------------- */
+
+    .icon-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 7px;
+        width: 214px;
+    }
+
+    .icon-choice {
+        aspect-ratio: 1;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        transition: transform 0.3s var(--ease-spring), color 0.25s,
+                    background 0.25s, box-shadow 0.25s, border-color 0.25s;
+    }
+    .icon-choice svg { width: 19px; height: 19px; }
+    .icon-choice:hover { color: var(--accent-strong); background: var(--surface-2); transform: scale(1.08); }
+    .icon-choice.on {
+        color: var(--on-accent);
+        background: linear-gradient(135deg, var(--accent-strong), var(--accent-partner));
+        border-color: transparent;
+        box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.4);
+    }
+
+    .popover-title { margin-bottom: 9px; display: block; }
+
+    .empty-note {
+        padding: 20px 14px;
+        text-align: center;
+        font-size: 0.76rem;
+        color: var(--text-tertiary);
+    }
+
+    .footer {
+        flex: 0 0 auto;
+        padding: 0 16px 13px;
+        font-size: 0.64rem;
+        color: var(--text-tertiary);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .footer-text { flex: 1; min-width: 0; }
+
+    .quit-btn {
+        padding: 4px 11px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text-tertiary);
+        font-size: 0.64rem;
+        font-weight: 600;
+        transition: background 0.2s, color 0.2s, border-color 0.2s,
+                    transform 0.16s var(--ease-spring);
+    }
+
+    /* Outline until hover, then it fills -- the destructive-button pattern,
+       toned down because quitting is recoverable. */
+    .quit-btn:hover {
+        color: var(--danger);
+        border-color: var(--danger);
+        background: rgba(255, 91, 82, 0.12);
+    }
+    .quit-btn:active { transform: scale(0.95); }
+</style>
+
+<div class="shell">
+    <div class="app-bg">
+        <div class="motif motif-1"></div>
+        <div class="motif motif-2"></div>
+        <div class="motif motif-3"></div>
+    </div>
+
+    <header class="header">
+        <h1 class="page-title"><span class="gradient-text">Audio Swapper</span></h1>
+        <button class="icon-btn" id="theme-btn" title="Theme"></button>
+        <button class="icon-btn" id="close-btn" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                 stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+    </header>
+
+    <div class="scroll">
+        <section>
+            <span class="section-title">Switch between</span>
+            <div class="pair">
+                <div class="slot irid" id="slot-a"></div>
+                <button class="swap-btn" id="swap-btn" title="Swap now">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M7 4 3 8l4 4"/><path d="M3 8h13a4 4 0 0 1 0 8h-1"/>
+                        <path d="m17 20 4-4-4-4"/>
+                    </svg>
+                </button>
+                <div class="slot irid" id="slot-b"></div>
+            </div>
+        </section>
+
+        <section>
+            <span class="section-title">Output devices</span>
+            <div class="panel rows" id="devices"></div>
+        </section>
+
+        <section>
+            <span class="section-title">Options</span>
+            <div class="panel" id="options"></div>
+        </section>
+    </div>
+
+    <div class="footer">
+        <span class="live-dot" id="footer-dot"></span>
+        <span class="truncate footer-text" id="footer-text">No output device</span>
+        <button class="quit-btn" id="quit-btn" title="Close Audio Swapper">Quit</button>
+    </div>
+
+    <div class="popover" id="icon-popover">
+        <span class="micro-label popover-title">Icon</span>
+        <div class="icon-grid" id="icon-grid"></div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+const el = id => document.getElementById(id);
+const root = document.documentElement;
+
+let state = {
+    icons: [],
+    devices: [],
+    options: {},
+    hotkeyError: null,
+};
+
+let iconPopoverDeviceId = null;
+
+function post(message) {
+    if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(message);
+}
+
+function svg(paths, size) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const node = document.createElementNS(ns, 'svg');
+    node.setAttribute('viewBox', '0 0 24 24');
+    node.setAttribute('fill', 'none');
+    node.setAttribute('stroke', 'currentColor');
+    node.setAttribute('stroke-width', '2');
+    node.setAttribute('stroke-linecap', 'round');
+    node.setAttribute('stroke-linejoin', 'round');
+    if (size) { node.style.width = size + 'px'; node.style.height = size + 'px'; }
+
+    for (const d of paths || []) {
+        const p = document.createElementNS(ns, 'path');
+        p.setAttribute('d', d);
+        node.appendChild(p);
+    }
+    return node;
+}
+
+function iconPaths(key) {
+    const found = state.icons.find(i => i.key === key);
+    return found ? found.paths : (state.icons[0] ? state.icons[0].paths : []);
+}
+
+function deviceById(id) {
+    return state.devices.find(d => d.id === id) || null;
+}
+
+// ---- The A/B pair ---------------------------------------------------------
+
+function renderSlot(node, slot) {
+    const device = state.devices.find(d => d.slot === slot);
+    node.innerHTML = '';
+    node.classList.toggle('empty', !device);
+    node.classList.toggle('is-live', !!device && device.isDefault);
+    node.style.position = 'relative';
+
+    const letter = document.createElement('span');
+    letter.className = 'slot-letter';
+    letter.textContent = slot;
+    node.appendChild(letter);
+
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'slot-icon';
+    iconWrap.appendChild(svg(iconPaths(device ? device.iconKey : 'generic')));
+    node.appendChild(iconWrap);
+
+    const name = document.createElement('div');
+    name.className = 'slot-name';
+    name.textContent = device ? device.name : 'Not set';
+    if (device) name.title = device.name;
+    node.appendChild(name);
+
+    if (device && device.isDefault) {
+        const chip = document.createElement('span');
+        chip.className = 'chip-state';
+        chip.textContent = 'Active';
+        node.appendChild(chip);
+    } else if (device && !device.active) {
+        const chip = document.createElement('span');
+        chip.className = 'chip-state chip-neutral';
+        chip.textContent = 'Unplugged';
+        node.appendChild(chip);
+    }
+}
+
+// ---- Device rows ----------------------------------------------------------
+
+function renderDevices() {
+    const host = el('devices');
+    host.innerHTML = '';
+
+    if (!state.devices.length) {
+        const note = document.createElement('div');
+        note.className = 'empty-note';
+        note.textContent = 'No audio outputs found.';
+        host.appendChild(note);
+        return;
+    }
+
+    for (const device of state.devices) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.classList.toggle('is-inactive', !device.active);
+
+        const iconBtn = document.createElement('button');
+        iconBtn.className = 'row-icon';
+        iconBtn.title = 'Change icon';
+        iconBtn.appendChild(svg(iconPaths(device.iconKey)));
+        iconBtn.addEventListener('click', event => {
+            event.stopPropagation();
+            openIconPicker(device.id, iconBtn);
+        });
+        row.appendChild(iconBtn);
+
+        const body = document.createElement('div');
+        body.className = 'row-body';
+
+        const name = document.createElement('div');
+        name.className = 'row-name';
+
+        const label = document.createElement('span');
+        label.className = 'truncate';
+        label.textContent = device.name;
+        name.appendChild(label);
+
+        if (device.isDefault) {
+            const dot = document.createElement('span');
+            dot.className = 'live-dot';
+            name.appendChild(dot);
+        }
+        body.appendChild(name);
+
+        const sub = document.createElement('div');
+        sub.className = 'row-sub truncate';
+        sub.textContent = device.active
+            ? (device.adapter || 'Available')
+            : (device.stateLabel || 'Not connected');
+        body.appendChild(sub);
+        row.appendChild(body);
+
+        const pills = document.createElement('div');
+        pills.className = 'slot-pills';
+        for (const slot of ['A', 'B']) {
+            const pill = document.createElement('button');
+            pill.className = 'slot-pill' + (device.slot === slot ? ' on' : '');
+            pill.textContent = slot;
+            pill.title = 'Use as ' + slot;
+            pill.addEventListener('click', event => {
+                event.stopPropagation();
+                post({ type: 'assign', deviceId: device.id, slot: device.slot === slot ? null : slot });
+            });
+            pills.appendChild(pill);
+        }
+        row.appendChild(pills);
+
+        // Clicking the row switches to that device straight away, which makes
+        // the menu a full device picker rather than only an A/B editor.
+        if (device.active && !device.isDefault) {
+            row.style.cursor = 'pointer';
+            row.title = 'Switch to this device';
+            row.addEventListener('click', () => post({ type: 'activate', deviceId: device.id }));
+        }
+
+        host.appendChild(row);
+    }
+}
+
+// ---- Options --------------------------------------------------------------
+
+const OPTION_ROWS = [
+    { key: 'alsoSetCommunications', name: 'Also switch calls',
+      hint: 'Moves the Communications device too, so Teams and Discord follow.' },
+    { key: 'showToast', name: 'Show popup',
+      hint: 'Confirmation in the bottom-right corner after every switch.' },
+    { key: 'trayReflectsDevice', name: 'Tray shows device',
+      hint: 'Tray icon becomes the active device icon.' },
+    { key: 'startWithWindows', name: 'Start with Windows',
+      hint: 'Adds a startup entry for your account only.' },
+];
+
+function renderOptions() {
+    const host = el('options');
+    host.innerHTML = '';
+
+    for (const spec of OPTION_ROWS) {
+        const row = document.createElement('div');
+        row.className = 'opt';
+
+        const body = document.createElement('div');
+        body.className = 'opt-body';
+        body.innerHTML = '';
+
+        const name = document.createElement('div');
+        name.className = 'opt-name';
+        name.textContent = spec.name;
+        body.appendChild(name);
+
+        const hint = document.createElement('div');
+        hint.className = 'opt-hint';
+        hint.textContent = spec.hint;
+        body.appendChild(hint);
+        row.appendChild(body);
+
+        const toggle = document.createElement('button');
+        toggle.className = 'toggle' + (state.options[spec.key] ? ' on' : '');
+        toggle.setAttribute('role', 'switch');
+        toggle.setAttribute('aria-checked', String(!!state.options[spec.key]));
+        toggle.setAttribute('aria-label', spec.name);
+        toggle.addEventListener('click', () => {
+            const next = !state.options[spec.key];
+            state.options[spec.key] = next;
+            toggle.classList.toggle('on', next);
+            toggle.setAttribute('aria-checked', String(next));
+            post({ type: 'option', name: spec.key, value: next });
+        });
+        row.appendChild(toggle);
+        host.appendChild(row);
+    }
+
+    // Hotkey row -- text field plus its own enable toggle.
+    const row = document.createElement('div');
+    row.className = 'opt';
+
+    const body = document.createElement('div');
+    body.className = 'opt-body';
+
+    const name = document.createElement('div');
+    name.className = 'opt-name';
+    name.textContent = 'Shortcut';
+    body.appendChild(name);
+
+    const hint = document.createElement('div');
+    hint.className = 'opt-hint';
+    hint.textContent = 'Press a combination while the box is focused.';
+    body.appendChild(hint);
+    row.appendChild(body);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'hotkey-input' + (state.hotkeyError ? ' invalid' : '');
+    input.value = state.options.hotkey || '';
+    input.readOnly = true;
+    input.title = 'Click, then press the keys you want';
+    input.addEventListener('keydown', onHotkeyCapture);
+    row.appendChild(input);
+
+    const toggle = document.createElement('button');
+    toggle.className = 'toggle' + (state.options.hotkeyEnabled ? ' on' : '');
+    toggle.setAttribute('role', 'switch');
+    toggle.setAttribute('aria-checked', String(!!state.options.hotkeyEnabled));
+    toggle.setAttribute('aria-label', 'Enable shortcut');
+    toggle.addEventListener('click', () => {
+        const next = !state.options.hotkeyEnabled;
+        state.options.hotkeyEnabled = next;
+        toggle.classList.toggle('on', next);
+        toggle.setAttribute('aria-checked', String(next));
+        post({ type: 'option', name: 'hotkeyEnabled', value: next });
+    });
+    row.appendChild(toggle);
+    host.appendChild(row);
+
+    if (state.hotkeyError) {
+        const note = document.createElement('div');
+        note.className = 'error-note';
+        note.textContent = state.hotkeyError;
+        host.appendChild(note);
+    }
+}
+
+const MODIFIER_KEYS = new Set(['Control', 'Alt', 'Shift', 'Meta', 'OS']);
+
+function onHotkeyCapture(event) {
+    event.preventDefault();
+
+    if (event.key === 'Escape') { event.target.blur(); return; }
+    if (MODIFIER_KEYS.has(event.key)) return;
+
+    const parts = [];
+    if (event.ctrlKey) parts.push('Ctrl');
+    if (event.altKey) parts.push('Alt');
+    if (event.shiftKey) parts.push('Shift');
+    if (event.metaKey) parts.push('Win');
+
+    // A bare key would be swallowed system-wide, so require a modifier.
+    if (!parts.length) return;
+
+    let key = event.key;
+    if (key.length === 1) key = key.toUpperCase();
+    else if (/^F\d{1,2}$/.test(key)) { /* already correct */ }
+    else if (key === ' ') key = 'Space';
+    else if (key === 'ArrowUp') key = 'Up';
+    else if (key === 'ArrowDown') key = 'Down';
+    else if (key === 'ArrowLeft') key = 'Left';
+    else if (key === 'ArrowRight') key = 'Right';
+
+    parts.push(key);
+    const gesture = parts.join('+');
+    event.target.value = gesture;
+    state.options.hotkey = gesture;
+    post({ type: 'setHotkey', value: gesture });
+}
+
+// ---- Icon picker ----------------------------------------------------------
+
+function openIconPicker(deviceId, anchor) {
+    const popover = el('icon-popover');
+    const device = deviceById(deviceId);
+    if (!device) return;
+
+    iconPopoverDeviceId = deviceId;
+
+    const grid = el('icon-grid');
+    grid.innerHTML = '';
+    for (const icon of state.icons) {
+        const choice = document.createElement('button');
+        choice.className = 'icon-choice' + (icon.key === device.iconKey ? ' on' : '');
+        choice.title = icon.label;
+        choice.setAttribute('aria-label', icon.label);
+        choice.appendChild(svg(icon.paths));
+        choice.addEventListener('click', event => {
+            event.stopPropagation();
+            post({ type: 'setIcon', deviceId, iconKey: icon.key });
+            closeIconPicker();
+        });
+        grid.appendChild(choice);
+    }
+
+    // Anchor under the trigger, then pull back inside the window if it would
+    // overhang. The popover is a sibling of .scroll, so coordinates are relative
+    // to the shell rather than the scrolled content.
+    const shell = document.querySelector('.shell').getBoundingClientRect();
+    const box = anchor.getBoundingClientRect();
+
+    // offsetWidth/offsetHeight, not getBoundingClientRect: the panel sits at
+    // scale(0.4) until it opens, and a bounding rect measured mid-transition
+    // reports that scaled size, which places the panel as though it were 40% of
+    // its real height and lets it hang off the bottom of the window.
+    const width = popover.offsetWidth;
+    const height = popover.offsetHeight;
+
+    let left = box.left - shell.left;
+    let top = box.bottom - shell.top + 8;
+
+    // Flip above the trigger when there is no room below it.
+    const flipped = top + height > shell.height - 12;
+    if (flipped) top = box.top - shell.top - height - 8;
+
+    left = Math.min(Math.max(12, left), Math.max(12, shell.width - width - 12));
+    top = Math.min(Math.max(12, top), Math.max(12, shell.height - height - 12));
+
+    popover.style.left = left + 'px';
+    popover.style.top = top + 'px';
+    // Grow from the corner nearest the trigger.
+    popover.style.transformOrigin = flipped ? 'bottom left' : 'top left';
+
+    requestAnimationFrame(() => popover.classList.add('open'));
+}
+
+function closeIconPicker() {
+    iconPopoverDeviceId = null;
+    el('icon-popover').classList.remove('open');
+}
+
+document.addEventListener('click', event => {
+    const popover = el('icon-popover');
+    if (popover.classList.contains('open') && !popover.contains(event.target)) closeIconPicker();
+});
+
+// ---- Theme ----------------------------------------------------------------
+
+const THEME_ICONS = {
+    system: ['M12 3.6a8.4 8.4 0 1 0 0 16.8 8.4 8.4 0 0 0 0-16.8z', 'M12 3.6v16.8a8.4 8.4 0 0 0 0-16.8z'],
+    dark: ['M20.2 14.4A8.6 8.6 0 0 1 9.6 3.8a8.6 8.6 0 1 0 10.6 10.6z'],
+    light: ['M12 7.4a4.6 4.6 0 1 0 0 9.2 4.6 4.6 0 0 0 0-9.2z',
+            'M12 1.8v2.4M12 19.8v2.4M4.8 4.8l1.7 1.7M17.5 17.5l1.7 1.7M1.8 12h2.4M19.8 12h2.4M4.8 19.2l1.7-1.7M17.5 6.5l1.7-1.7'],
+};
+
+const THEME_ORDER = ['system', 'dark', 'light'];
+
+function renderThemeButton() {
+    const button = el('theme-btn');
+    const mode = state.options.theme || 'system';
+    button.innerHTML = '';
+    button.appendChild(svg(THEME_ICONS[mode] || THEME_ICONS.system));
+    button.title = 'Theme: ' + mode;
+}
+
+el('theme-btn').addEventListener('click', () => {
+    const current = state.options.theme || 'system';
+    const next = THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length];
+    state.options.theme = next;
+    renderThemeButton();
+    post({ type: 'option', name: 'theme', value: next });
+});
+
+el('close-btn').addEventListener('click', () => post({ type: 'close' }));
+el('swap-btn').addEventListener('click', () => post({ type: 'swap' }));
+el('quit-btn').addEventListener('click', () => post({ type: 'quit' }));
+
+// ---- Render ---------------------------------------------------------------
+
+function render() {
+    renderSlot(el('slot-a'), 'A');
+    renderSlot(el('slot-b'), 'B');
+    renderDevices();
+    renderOptions();
+    renderThemeButton();
+
+    const hasPair = state.devices.some(d => d.slot === 'A') && state.devices.some(d => d.slot === 'B');
+    el('swap-btn').disabled = !hasPair;
+    el('swap-btn').title = hasPair ? 'Swap now' : 'Assign a device to both A and B first';
+
+    const active = state.devices.find(d => d.isDefault);
+    el('footer-text').textContent = active ? 'Now playing to ' + active.name : 'No output device';
+    el('footer-dot').style.display = active ? '' : 'none';
+}
+
+function apply(payload) {
+    root.dataset.theme = payload.theme || 'dark';
+    root.dataset.shell = payload.shell || 'alpha';
+
+    state.icons = payload.icons || state.icons;
+    state.devices = payload.devices || [];
+    state.options = payload.options || {};
+    state.hotkeyError = payload.hotkeyError || null;
+
+    render();
+}
+
+if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', event => {
+        const payload = event.data;
+        if (payload && payload.type === 'state') apply(payload);
+    });
+}
+
+post({ type: 'ready' });
+</script>

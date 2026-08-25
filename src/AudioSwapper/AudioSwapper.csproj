@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- The explicit 10.0.19041.0 platform version is what lets
+         SupportedOSPlatformVersion below be set; a bare net10.0-windows pins
+         TargetPlatformVersion to 7.0. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- WinForms comes along only for NotifyIcon: WPF has no tray icon of its
+         own, and NotifyIcon is the same shell API a native app would call. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>AudioSwapper</AssemblyName>
+    <RootNamespace>AudioSwapper</RootNamespace>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- WFO0003 tells WinForms apps to set DPI mode via ApplicationHighDpiMode
+         instead of the manifest. This process is WPF-hosted and never calls
+         ApplicationConfiguration.Initialize(), so the manifest is the only
+         thing that actually applies the setting here. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <Version>1.1.0</Version>
+    <Product>Audio Swapper</Product>
+    <AssemblyTitle>Audio Swapper</AssemblyTitle>
+  </PropertyGroup>
+
+  <!-- This process sits idle in the tray almost all of the time, so it is tuned
+       for footprint rather than throughput. Concurrent GC costs a background
+       thread and extra committed heap that buy nothing here, and the workstation
+       collector keeps a single small heap instead of one per core. -->
+  <PropertyGroup>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+    <AutoreleasePoolSupport>false</AutoreleasePoolSupport>
+    <EventSourceSupport>false</EventSourceSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Matches the WebView2 Runtime build installed on this machine
+         (151.0.4129.x), so no SDK-newer-than-runtime API gaps. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
+  </ItemGroup>
+
+  <!-- The settings panel is embedded rather than copied next to the exe so the
+       build stays a single self-contained artefact and NavigateToString can
+       serve it without a file:// origin or a virtual host mapping.
+       The toast has no page: it is drawn natively (see Ui/ToastWindow.xaml). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Web\glass.css" />
+    <EmbeddedResource Include="Web\menu.html" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,625 @@
+/* ==========================================================================
+   Audio Swapper -- settings panel styles.
+
+   A soft, rounded, translucent look: panels are near-transparent sheets of
+   glass floating over a slowly drifting coloured background. Depth comes from
+   blur and shadow rather than borders and fills, nothing has a square corner,
+   and colour is rationed to one accent family plus semantic warning/danger.
+
+   Accent family here is Azure. The motif behind the glass is concentric rings,
+   picked because this app is about audio.
+   ========================================================================== */
+
+/* The iridescent edge angle must be a registered property: unregistered custom
+   properties cannot be interpolated, so the edge would jump 0 -> 360 instead of
+   rotating. */
+@property --iri {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+}
+
+:root {
+    color-scheme: dark;
+
+    /* ---- Accent family: Azure ---- */
+    --accent:         #2f7bff;
+    --accent-strong:  #4d9bff;
+    --accent-partner: #00d4ff;
+    --accent-third:   #a78bfa;
+    --on-accent:      #04142e;
+    --warning: #ffb02e;
+    --danger:  #ff5b52;
+
+    --accent-rgb:        47, 123, 255;
+    --accent-strong-rgb: 77, 155, 255;
+
+    /* ---- Radii -- nothing is square ---- */
+    --radius-lg: 30px;
+    --radius:    22px;
+    --radius-sm: 14px;
+    --radius-xs: 10px;
+    --radius-pill: 999px;
+
+    /* ---- Motion ---- */
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-smooth: cubic-bezier(0.33, 1, 0.68, 1);
+    --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* ---- Surfaces ---- */
+    --bg-0: #171c24;
+    --bg-1: #212936;
+    --text-primary:   #f1f4f8;
+    --text-secondary: #aab4c1;
+    --text-tertiary:  #7b8593;
+
+    /* ---- Glass. The fill is 1%. Raise the blur, never the fill. ---- */
+    --glass-bg:        rgba(34, 41, 51, 0.01);
+    --glass-bg-strong: rgba(30, 37, 47, 0.05);
+    --glass-border:    rgba(255, 255, 255, 0.17);
+    --glass-hi:        rgba(255, 255, 255, 0.26);
+    --glass-shadow:    0 22px 54px -14px rgba(0, 0, 0, 0.5);
+
+    --glass-filter:        blur(5px)  saturate(125%);
+    --glass-filter-sm:     blur(3px)  saturate(120%);
+    --glass-filter-strong: blur(10px) saturate(130%);
+
+    --glass-sheen: linear-gradient(transparent, transparent);
+
+    --modal-bg:    rgba(23, 28, 35, 0.74);
+    --dropdown-bg: rgba(23, 28, 35, 0.90);
+
+    --surface:   rgba(255, 255, 255, 0.045);
+    --surface-2: rgba(255, 255, 255, 0.08);
+    --border:    rgba(255, 255, 255, 0.09);
+    --input-bg:  rgba(255, 255, 255, 0.05);
+
+    --motif-line: rgba(255, 255, 255, 0.08);
+    --sheen:      rgba(255, 255, 255, 0.55);
+    --scrollbar:  rgba(255, 255, 255, 0.16);
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+
+    --bg-0: #f1f5fb;
+    --bg-1: #e4eaf4;
+    --text-primary:   #141a22;
+    --text-secondary: #566173;
+    --text-tertiary:  #8a95a5;
+
+    --glass-bg:        rgba(255, 255, 255, 0.02);
+    --glass-bg-strong: rgba(255, 255, 255, 0.09);
+    /* Near-white in light mode, not a dark line. Light glass is edged with
+       light -- a dark border here turns panes back into boxes. */
+    --glass-border:    rgba(255, 255, 255, 0.9);
+    --glass-hi:        rgba(255, 255, 255, 1);
+    --glass-shadow:    0 22px 54px -16px rgba(35, 52, 84, 0.22);
+
+    --glass-filter:        blur(5px)  saturate(120%);
+    --glass-filter-sm:     blur(3px)  saturate(115%);
+    --glass-filter-strong: blur(10px) saturate(125%);
+
+    --modal-bg:    rgba(245, 248, 252, 0.86);
+    --dropdown-bg: rgba(245, 248, 252, 0.94);
+
+    --surface:   rgba(255, 255, 255, 0.55);
+    --surface-2: rgba(255, 255, 255, 0.82);
+    --border:    rgba(24, 38, 64, 0.10);
+    --input-bg:  rgba(255, 255, 255, 0.7);
+
+    --motif-line: rgba(40, 62, 96, 0.09);
+    --sheen:      rgba(255, 255, 255, 0.85);
+    --scrollbar:  rgba(40, 60, 90, 0.22);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+}
+
+body {
+    font-family: 'Segoe UI Variable Text', 'Segoe UI', -apple-system,
+                 BlinkMacSystemFont, Inter, system-ui, sans-serif;
+    line-height: 1.5;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    cursor: default;
+}
+
+/* The rounded shell. Everything lives inside it so the whole window reads as a
+   single soft object rather than a rectangle with rounded art painted on. */
+.shell {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--bg-0);
+    isolation: isolate;
+}
+
+.shell.compact { border-radius: var(--radius); }
+
+/* When the host window cannot do per-pixel alpha, the shell must not be inset
+   or its rounded corners would expose the square window behind it. */
+:root[data-shell="opaque"] .shell { border-radius: 0; }
+
+/* ==========================================================================
+   Ambient background. Do this before any glass.
+   ========================================================================== */
+
+.app-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+        radial-gradient(1200px 820px at 12% -12%, rgba(47, 123, 255, 0.20), transparent 60%),
+        radial-gradient(1050px 760px at 104% 2%, rgba(167, 139, 250, 0.17), transparent 56%),
+        radial-gradient(920px 900px at 82% 116%, rgba(0, 212, 255, 0.14), transparent 60%),
+        radial-gradient(760px 620px at 48% 52%, rgba(96, 120, 255, 0.10), transparent 62%),
+        linear-gradient(162deg, var(--bg-0) 0%, var(--bg-1) 55%, var(--bg-0) 100%);
+    transition: background 0.6s var(--ease-smooth);
+}
+
+/* Concentric rings, chosen because the app is about audio. They give the blur
+   an edge to bend -- a pure gradient blurs into nothing and the panes read
+   flat. */
+.app-bg .motif {
+    position: absolute;
+    border-radius: 50%;
+    background: repeating-radial-gradient(circle, var(--motif-line) 0 1.5px, transparent 1.5px 20px);
+    -webkit-mask: radial-gradient(circle, #000 0 46%, transparent 63%);
+            mask: radial-gradient(circle, #000 0 46%, transparent 63%);
+    opacity: 0.9;
+    will-change: transform;
+}
+
+/* The mismatched durations are the point: coprime-ish and absurdly slow, so the
+   composition never repeats and the motion is never perceptible as motion. */
+.app-bg .motif-1 { width: 520px; height: 520px; top: -170px;    right: -150px; animation: drift1 46s ease-in-out infinite; }
+.app-bg .motif-2 { width: 460px; height: 460px; bottom: -180px; left: -150px;  animation: drift2 58s ease-in-out infinite; }
+.app-bg .motif-3 { width: 400px; height: 400px; top: 34%;       left: 38%;     animation: drift1 66s ease-in-out infinite reverse; }
+
+@keyframes drift1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(-34px, 30px) scale(1.06); }
+}
+@keyframes drift2 {
+    0%, 100% { transform: translate(0, 0) scale(1.04); }
+    50%      { transform: translate(30px, -26px) scale(1); }
+}
+
+/* ==========================================================================
+   The glass recipe
+   ========================================================================== */
+
+.glass {
+    background: var(--glass-sheen), var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: var(--glass-filter-sm);
+    -webkit-backdrop-filter: var(--glass-filter-sm);
+    /* The big soft cast makes it float; the 1px inset top highlight is light
+       catching the bevel. A pane without the highlight looks like a hole. */
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hi);
+}
+
+.glass-strong {
+    backdrop-filter: var(--glass-filter-strong);
+    -webkit-backdrop-filter: var(--glass-filter-strong);
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+
+.section-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin: 0 0 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-title::before {
+    content: '';
+    width: 4px;
+    height: 15px;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(var(--accent-strong), var(--accent-partner));
+    box-shadow: 0 0 10px rgba(var(--accent-strong-rgb), 0.5);
+}
+
+.micro-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary);
+    font-weight: 600;
+}
+
+.card-title {
+    font-size: 0.96rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+.page-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+/* Reserved for the page title only -- applying this to every heading is the
+   fastest way to make the language look cheap. */
+.gradient-text {
+    background: linear-gradient(120deg, var(--accent-strong), var(--accent-partner));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   The signature: iridescent edge + specular sweep
+   ========================================================================== */
+
+.irid { position: relative; overflow: hidden; isolation: isolate; }
+
+.irid::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 55%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, var(--sheen), transparent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* Paint the gradient over the whole box, mask with a border-box layer and a
+   content-box layer, exclude them, and only the padding ring survives. The
+   padding value IS the resulting edge thickness. */
+.irid::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.4px;
+    background: conic-gradient(from var(--iri),
+        var(--accent-strong), var(--accent-partner), var(--accent-third), var(--accent-strong));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 4;
+    transition: opacity 0.35s var(--ease-smooth);
+}
+
+@media (hover: hover) {
+    .irid.interactive:hover::after  { opacity: 0.9; animation: iriSpin 6s linear infinite; }
+    .irid.interactive:hover::before { animation: sheenSweep 0.9s var(--ease-smooth); }
+}
+
+/* Selection gets the edge without the lift, so state stays legible. */
+.irid.is-selected { border-color: transparent; }
+.irid.is-selected::after { opacity: 0.9; animation: iriSpin 6s linear infinite; }
+
+@keyframes sheenSweep {
+    0%   { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+    18%  { opacity: 1; }
+    100% { transform: translateX(240%) skewX(-18deg); opacity: 0; }
+}
+
+@keyframes iriSpin { to { --iri: 360deg; } }
+
+/* ==========================================================================
+   Hover and press. One lift, one squash.
+   ========================================================================== */
+
+.interactive {
+    cursor: pointer;
+    transition: transform 0.35s var(--ease-spring),
+                box-shadow 0.35s var(--ease-smooth),
+                background 0.25s, border-color 0.25s;
+}
+
+@media (hover: hover) {
+    .lift:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 26px 56px -18px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-hi);
+        border-color: transparent;
+    }
+}
+
+.lift:active { transform: translateY(-1px) scale(0.985); }
+
+/* ==========================================================================
+   Components
+   ========================================================================== */
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: inherit;
+}
+
+/* Circular icon buttons. 34px is this app's bar unit. */
+.icon-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: inset 0 1px 0 var(--glass-hi);
+    transition: transform 0.35s var(--ease-spring), color 0.25s,
+                background 0.25s, box-shadow 0.25s, border-color 0.25s;
+}
+
+@media (hover: hover) {
+    .icon-btn:hover {
+        background: var(--surface-2);
+        color: var(--accent-strong);
+        transform: translateY(-1px) scale(1.05);
+        box-shadow: inset 0 1px 0 var(--glass-hi), 0 6px 16px rgba(var(--accent-rgb), 0.2);
+    }
+}
+
+.icon-btn:active { transform: scale(0.92); }
+
+/* The "on" state inverts to a filled accent gradient. */
+.icon-btn.on {
+    color: var(--on-accent);
+    background: linear-gradient(135deg, var(--accent-strong), var(--accent-partner));
+    border-color: transparent;
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.5),
+                0 6px 18px rgba(var(--accent-rgb), 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.icon-btn svg { width: 17px; height: 17px; }
+
+/* Buttons */
+.btn-primary {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(140deg, var(--accent), var(--accent-partner));
+    color: var(--on-accent);
+    padding: 9px 20px;
+    border-radius: var(--radius-pill);
+    font-size: 0.82rem;
+    font-weight: 700;
+    box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.32);
+    transition: filter 0.2s, transform 0.2s var(--ease-spring), box-shadow 0.25s;
+}
+
+/* brightness(), not a colour swap -- it keeps the gradient intact. */
+.btn-primary:hover {
+    filter: brightness(1.08);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.4);
+}
+.btn-primary:active { transform: scale(0.96); }
+
+.btn-quiet {
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--glass-border);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: transform 0.16s var(--ease-spring), background 0.2s,
+                color 0.2s, border-color 0.2s;
+}
+.btn-quiet:hover { color: var(--text-primary); background: var(--surface); }
+.btn-quiet:active { transform: scale(0.96); }
+
+/* Translucent state chips. Fill ~0.16, border ~0.22, text solid. */
+.chip-state {
+    background: rgba(var(--accent-strong-rgb), 0.16);
+    color: var(--accent-strong);
+    border: 1px solid rgba(var(--accent-strong-rgb), 0.22);
+    border-radius: var(--radius-pill);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 9px;
+    white-space: nowrap;
+}
+
+:root[data-theme="light"] .chip-state { color: #1b5fd0; }
+
+.chip-neutral {
+    background: rgba(160, 172, 188, 0.14);
+    color: var(--text-secondary);
+    border-color: rgba(160, 172, 188, 0.18);
+}
+
+/* Live status breathes; it never blinks. Blinking reads as an error. */
+.live-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: var(--accent-strong);
+    animation: dotBreathe 2.6s ease-in-out infinite;
+}
+
+@keyframes dotBreathe {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(var(--accent-strong-rgb), 0.16), 0 0 8px  rgba(var(--accent-strong-rgb), 0.45); }
+    50%      { box-shadow: 0 0 0 5px rgba(var(--accent-strong-rgb), 0.06), 0 0 14px rgba(var(--accent-strong-rgb), 0.7); }
+}
+
+/* Lists: one glass container, hairline-separated rows. Per-row glass
+   would flatten both. */
+.rows { border-radius: var(--radius); overflow: hidden; }
+.row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+}
+.row:last-child { border-bottom: none; }
+.row:hover { background: var(--surface); }
+.row.is-inactive .row-name { color: var(--text-tertiary); }
+
+/* Popovers. No scrim behind them, so the fill has to be firm (0.90).
+   Raising the blur instead would do nothing: an ancestor with backdrop-filter
+   becomes a backdrop root and the child can only sample inside it. */
+.popover {
+    position: absolute;
+    background: var(--dropdown-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 12px;
+    z-index: 150;
+    backdrop-filter: var(--glass-filter-strong);
+    -webkit-backdrop-filter: var(--glass-filter-strong);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hi);
+    transform: scale(0.4) translateY(-8px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.34s var(--ease-bounce), opacity 0.22s ease,
+                visibility 0s 0.34s;
+}
+
+/* The visibility delay is what lets it animate out; without it the panel either
+   cannot animate closed or eats clicks while invisible. */
+.popover.open {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform 0.34s var(--ease-bounce), opacity 0.22s ease,
+                visibility 0s 0s;
+}
+
+/* Inputs. Focus is always a 3px accent ring. */
+input[type="text"] {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--text-primary);
+    padding: 7px 11px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    outline: none;
+    user-select: text;
+    cursor: text;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: border-color 0.2s var(--ease-smooth), box-shadow 0.25s var(--ease-smooth),
+                transform 0.2s var(--ease-spring);
+}
+input[type="text"]:hover { border-color: rgba(var(--accent-rgb), 0.4); }
+input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
+    transform: translateY(-1px);
+}
+input[type="text"].invalid {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(255, 91, 82, 0.22);
+}
+
+/* Toggle switch -- the pill vocabulary applied to a boolean. */
+.toggle {
+    position: relative;
+    width: 38px;
+    height: 21px;
+    flex: 0 0 38px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: background 0.25s var(--ease-smooth), border-color 0.25s, box-shadow 0.25s;
+}
+
+.toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    transition: transform 0.3s var(--ease-spring), background 0.25s;
+}
+
+.toggle.on {
+    background: linear-gradient(120deg, var(--accent), var(--accent-partner));
+    border-color: transparent;
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.4), 0 4px 12px rgba(var(--accent-rgb), 0.35);
+}
+.toggle.on::after { transform: translateX(17px); background: #fff; }
+.toggle:active::after { width: 18px; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+/* Focus visibility is never removed, only replaced. */
+:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.5);
+    border-radius: var(--radius-xs);
+}
+
+/* Honour the OS reduce-motion setting. The drift, the spin, the sweep
+   and the breathing dot all stop; nothing depends on motion to be legible. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+    .app-bg .motif { animation: none; }
+    .live-dot { animation: none; box-shadow: 0 0 8px rgba(var(--accent-strong-rgb), 0.45); }
+}

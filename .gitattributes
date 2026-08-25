@@ -1,0 +1,18 @@
+# Normalise line endings so the repo is not full of spurious whole-file diffs
+# when someone clones on a different platform.
+* text=auto eol=lf
+
+# These are only ever run by Windows tooling, which wants CRLF.
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+*.sln   text eol=crlf
+
+# Binary; never touch.
+*.png   binary
+*.ico   binary
+*.exe   binary
+
+# Keep generated project noise out of diffs and language stats.
+*.csproj    text eol=crlf
+tools/**    linguist-vendored

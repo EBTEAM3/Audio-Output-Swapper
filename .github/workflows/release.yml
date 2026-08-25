@@ -1,0 +1,55 @@
+name: Release
+
+# Tag a commit and push the tag to cut a release:
+#   git tag v1.1.0 && git push origin v1.1.0
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.1.0)'
+        required: true
+
+permissions:
+  contents: write   # needed to create the release and upload the exe
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build standalone exe
+        run: pwsh -File build.ps1 -Output "${{ github.workspace }}/dist"
+
+      - name: Report size
+        shell: pwsh
+        run: |
+          $exe = Get-Item "${{ github.workspace }}/dist/AudioSwapper.exe"
+          "AudioSwapper.exe is {0} MB" -f [math]::Round($exe.Length / 1MB, 1)
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: dist/AudioSwapper.exe
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            Download **AudioSwapper.exe** below and run it. The tray icon
+            appears; there is no window and nothing to install.
+
+            Everything it needs is bundled — no .NET runtime required.
+
+            > Windows will show *"Windows protected your PC"* the first time,
+            > because the exe is not code-signed. Click **More info → Run
+            > anyway**, or build it yourself from source.
+
+            To pin the icon next to the clock:
+            **Settings → Personalization → Taskbar → Other system tray icons**.

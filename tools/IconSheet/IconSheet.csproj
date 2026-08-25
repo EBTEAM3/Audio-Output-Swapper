@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Dev harness: renders every DeviceIcon through the real tray pipeline
+    (Geometry.Parse -> RenderTargetBitmap -> GDI HICON) and writes a contact
+    sheet. Not shipped with the app; it exists so the tray glyphs can be checked
+    at their true pixel sizes without hunting for the icon on a taskbar.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>AudioSwapper.Tools</RootNamespace>
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <!-- The real sources, not copies, so this cannot drift from the app. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\AudioSwapper\Ui\DeviceIcons.cs" />
+    <Compile Include="..\..\src\AudioSwapper\Ui\TrayIconRenderer.cs" />
+    <Compile Include="..\..\src\AudioSwapper\Audio\AudioDevice.cs" />
+    <Compile Include="..\..\src\AudioSwapper\Audio\ComInterop.cs" />
+  </ItemGroup>
+
+</Project>

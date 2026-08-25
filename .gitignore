@@ -1,0 +1,24 @@
+# Build output. Note this project lives in a OneDrive folder, so these also sync
+# unless the folder is excluded -- bin/ alone is ~50 MB after a publish.
+bin/
+obj/
+build/
+dist/
+
+# Dev tool output
+tools/IconSheet/bin/
+tools/IconSheet/obj/
+
+# Screenshots produced by tools/Capture-Window.ps1 and friends land wherever
+# they are pointed; the README images in docs/ are checked in deliberately.
+/*.png
+!docs/*.png
+
+# Editor
+.vs/
+*.user
+*.suo
+
+# Python bytecode from tools/preview.py
+__pycache__/
+*.pyc
