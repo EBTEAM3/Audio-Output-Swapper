@@ -27,7 +27,7 @@
          ApplicationConfiguration.Initialize(), so the manifest is the only
          thing that actually applies the setting here. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Product>Audio Swapper</Product>
     <AssemblyTitle>Audio Swapper</AssemblyTitle>
   </PropertyGroup>

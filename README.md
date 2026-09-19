@@ -101,6 +101,22 @@ while the app is closed.
 | **Theme** | Follows Windows | The circle button in the header cycles system → dark → light. |
 | `ToastBottomOffset` | 94 | Config-file only. Gap in device-independent pixels between the popup and the bottom of the screen, set high enough to clear media controls and other corner overlays. |
 
+### If a paired device stops working
+
+Windows endpoint ids are not permanent. A driver reinstall, a Windows update or
+the device being re-enumerated re-creates the endpoint under a fresh id and
+deletes the old one, which leaves a pairing saved beforehand pointing at nothing
+— Windows' own picker keeps working, because it lists live devices by name.
+
+The app detects this and re-points the pairing at the live endpoint by name on
+the next refresh, carrying the icon across. If the device has also been renamed
+it cannot match it, and says so; re-pick it in the menu.
+
+A device whose speakers are simply switched off is a different case and still
+switchable: a permanently wired output reports *unplugged* on any motherboard
+with jack detection, and the app attempts the switch rather than refusing it.
+Only *not present* and *disabled in Windows* are refused.
+
 ### Device icons
 
 Twelve icons ship: speakers, headphones, wireless earbuds, headset, sound bar,

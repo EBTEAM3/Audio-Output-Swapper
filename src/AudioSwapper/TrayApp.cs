@@ -181,6 +181,12 @@ internal sealed class TrayApp : IDisposable
 
         if (dirty) Save();
 
+        // Re-point saved pairings at re-created endpoints before anything reads
+        // them, so the menu, the tray tooltip and the A/B pills all agree with
+        // what is actually plugged in.
+        Resolve(_config.DeviceA);
+        Resolve(_config.DeviceB);
+
         UpdateTrayIcon();
     }
 
@@ -213,38 +219,150 @@ internal sealed class TrayApp : IDisposable
         return currentId == a.Id ? b : a;
     }
 
+    // ---- Resolving a saved pairing ----------------------------------------
+
+    /// <summary>
+    /// Finds the live endpoint for a saved pairing, by id first and then by name.
+    ///
+    /// Endpoint ids are NOT permanent. A driver reinstall, a Windows update or
+    /// the audio device being re-enumerated re-creates the endpoint under a
+    /// fresh GUID and deletes the old one from the registry outright. A pairing
+    /// saved before that then points at nothing, and every switch fails while
+    /// Windows' own picker keeps working -- because Windows lists live devices
+    /// by name rather than remembering an id.
+    ///
+    /// So the friendly name is the fallback identity, and the healed id is
+    /// written straight back to config: the name lookup happens once, not on
+    /// every click.
+    /// </summary>
+    private AudioDevice? Resolve(RememberedDevice? remembered)
+    {
+        if (remembered is null) return null;
+
+        var byId = _devices.FirstOrDefault(d => d.Id == remembered.Id);
+        if (byId is not null) return byId;
+
+        if (string.IsNullOrWhiteSpace(remembered.Name)) return null;
+
+        // Prefer a usable endpoint when a name appears more than once -- the
+        // dead duplicates left behind by a reinstall enumerate as NotPresent.
+        var byName = _devices
+            .Where(d => string.Equals(d.Name, remembered.Name, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(d => d.IsActive)
+            .ThenByDescending(d => d.State != DeviceState.NotPresent)
+            .FirstOrDefault();
+
+        if (byName is null) return null;
+
+        HealPairing(remembered, byName);
+        return byName;
+    }
+
+    /// <summary>Repoints a saved pairing at a re-created endpoint and carries its icon across.</summary>
+    private void HealPairing(RememberedDevice remembered, AudioDevice live)
+    {
+        string oldId = remembered.Id;
+
+        // The icon was filed under the dead id, so move it rather than letting
+        // the device silently revert to a guessed one.
+        if (!_config.IconsByDeviceId.ContainsKey(live.Id))
+        {
+            _config.IconsByDeviceId[live.Id] =
+                _config.IconsByDeviceId.TryGetValue(oldId, out string? icon) ? icon : remembered.IconKey;
+        }
+
+        _config.IconsByDeviceId.Remove(oldId);
+        _config.NamesByDeviceId.Remove(oldId);
+        _config.NamesByDeviceId[live.Id] = live.Name;
+
+        remembered.Id = live.Id;
+        remembered.Name = live.Name;
+        remembered.IconKey = _config.IconsByDeviceId[live.Id];
+
+        Save();
+    }
+
     // ---- Switching --------------------------------------------------------
 
     private void Swap()
     {
-        var a = _config.DeviceA;
-        var b = _config.DeviceB;
-
-        if (a is null || b is null)
+        if (_config.DeviceA is null || _config.DeviceB is null)
         {
             // Nothing configured yet. Open the menu rather than failing quietly.
             _ = _menu.ToggleAsync();
             return;
         }
 
-        string? currentId = _audio.TryGetDefaultId(ERole.Multimedia);
-        var target = currentId == a.Id ? b : a;
+        var a = Resolve(_config.DeviceA);
+        var b = Resolve(_config.DeviceB);
 
-        SwitchTo(target.Id);
+        if (a is null && b is null)
+        {
+            ShowToast("Neither paired device found", "Open the menu and pick them again",
+                      DeviceIcons.DefaultKey, kicker: "Not found",
+                      communications: false, isError: true);
+            return;
+        }
+
+        string? currentId = _audio.TryGetDefaultId(ERole.Multimedia);
+
+        // Head for whichever half of the pair is not already playing. When only
+        // one half resolves, that one is the target unless we are on it.
+        AudioDevice? target;
+        if (a is not null && currentId == a.Id) target = b;
+        else if (b is not null && currentId == b.Id) target = a;
+        else target = a ?? b;
+
+        if (target is null)
+        {
+            var missing = (a is null ? _config.DeviceA : _config.DeviceB)!;
+            ShowToast(missing.Name, "No longer exists -- pick it again in the menu",
+                      missing.IconKey, kicker: "Not found",
+                      communications: false, isError: true);
+            return;
+        }
+
+        SwitchTo(target);
     }
 
     private void SwitchTo(string deviceId)
     {
         var device = _devices.FirstOrDefault(d => d.Id == deviceId);
 
-        if (device is null || !device.IsActive)
+        if (device is null)
         {
-            string name = device?.Name
-                          ?? (_config.NamesByDeviceId.TryGetValue(deviceId, out string? cached)
-                              ? cached
-                              : "That device");
+            string name = _config.NamesByDeviceId.TryGetValue(deviceId, out string? cached)
+                ? cached
+                : "That device";
 
-            ShowToast(name, "Not connected right now", IconKeyFor(deviceId),
+            ShowToast(name, "No longer exists -- pick it again in the menu", IconKeyFor(deviceId),
+                      kicker: "Not found", communications: false, isError: true);
+            return;
+        }
+
+        SwitchTo(device);
+    }
+
+    private void SwitchTo(AudioDevice device)
+    {
+        // Only refuse the states Windows itself cannot switch to.
+        //
+        // Unplugged is deliberately NOT one of them. A permanently wired output
+        // whose speakers are switched off at the wall reports Unplugged on any
+        // motherboard with jack detection, and Windows' own picker will happily
+        // select it -- so refusing here was the bug that made a perfectly good
+        // output unreachable. Attempt it, and report the real failure if the
+        // attempt is actually refused.
+        string? blocked = device.State switch
+        {
+            DeviceState.NotPresent => "Not connected",
+            DeviceState.Disabled => "Disabled in Windows sound settings",
+            _ => null,
+        };
+
+        if (blocked is not null)
+        {
+            ShowToast(device.Name, blocked, IconKeyFor(device),
                       kicker: "Unavailable", communications: false, isError: true);
             return;
         }
